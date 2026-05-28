@@ -5,6 +5,7 @@ import makeWASocket, {
   fetchLatestBaileysVersion
 } from "@whiskeysockets/baileys";
 import pino from "pino";
+import http from "node:http";
 import { Boom } from "@hapi/boom";
 import mysql from "mysql2/promise";
 import { exec } from "child_process";
@@ -156,4 +157,18 @@ async function handleMessage(sock, msg, from, body) {
   }
 }
 
+const server = http.createServer((req, res) => {
+  res.writeHead(200, {
+    "Content-Type": "application/json",
+  });
+
+  res.end(JSON.stringify({
+    ok: true,
+  }));
+});
+server.listen(3000, () => {
+  console.log("HTTP server running on port 3000");
+});
+
 startSocket().catch(console.error);
+
