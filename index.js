@@ -117,17 +117,15 @@ async function handleMessage(sock, msg, from, body) {
 
       let result = await eval(code);
 
-      result = util.inspect(result, {
-        depth: 1,
-      });
+      const output = util.inspect(result, { depth: 10 });
 
       await sock.sendMessage(from, {
-        text: result
+        text: output
       }, { quoted: msg });
 
     } catch (err) {
       await sock.sendMessage(from, {
-        text: err
+        text: String(err)
       }, { quoted: msg });
     }
 
