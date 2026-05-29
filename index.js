@@ -11,7 +11,7 @@ import { exec } from "child_process";
 import util from "util";
 
 import { useMySQLAuthState } from "./lib/useMySQLAuthState.js"
-import { pool, closeDatabasePool } from "./mysqlDB.js"
+import { pool, closeDatabasePool } from "./lib/mysqlDB.js"
 
 const PORT = Number(process.env.PORT) || 3000;
 const IS_BUN = typeof Bun !== "undefined";
