@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "bun index.js"
+    "start:node": "node index.js",
+    "start:bun": "bun index.js"
   },
   "keywords": [],
   "author": "vrypt",
