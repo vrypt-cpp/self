@@ -155,18 +155,17 @@ async function handleMessage(sock, msg, from, body) {
   }
 }
 
-const server = http.createServer((req, res) => {
-  res.writeHead(200, {
-    "Content-Type": "application/json",
-  });
+Bun.serve({
+  port: 3000,
 
-  res.end(JSON.stringify({
-    ok: true,
-  }));
+  fetch(req) {
+    return Response.json({
+      ok: true,
+    });
+  },
 });
-server.listen(3000, () => {
-  console.log("HTTP server running on port 3000");
-});
+
+console.log("HTTP server running on port 3000");
 
 startSocket().catch(console.error);
 
