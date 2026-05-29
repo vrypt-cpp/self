@@ -27,6 +27,29 @@ const pool = mysql.createPool({
   keepAliveInitialDelay: 0,
 });
 
+const PORT = Number(process.env.PORT) || 3000;
+const IS_BUN = typeof Bun !== "undefined";
+
+function startServer() {
+  if (IS_BUN) {
+    Bun.serve({
+      port: PORT,
+      fetch(req) {
+        return Response.json({ ok: true });
+      },
+    });
+  } else {
+    const server = http.createServer((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+    });
+
+    server.listen(PORT);
+  }
+
+  console.log(`HTTP server running on port ${PORT} (${IS_BUN ? "Bun" : "Node.js"})`);
+}
+
 async function startSocket() {
   const { state, saveCreds, clearState } = await useMySQLAuthState(pool, "sessions");
   const { version, isLatest } = await fetchLatestBaileysVersion();
@@ -114,19 +137,12 @@ async function handleMessage(sock, msg, from, body) {
   if (lower.startsWith(">")) {
     try {
       const code = text.slice(1).trim();
-
-      let result = await eval(code);
-
+      const result = await eval(code);
       const output = util.inspect(result, { depth: 10 });
 
-      await sock.sendMessage(from, {
-        text: output
-      }, { quoted: msg });
-
+      await sock.sendMessage(from, { text: output }, { quoted: msg });
     } catch (err) {
-      await sock.sendMessage(from, {
-        text: String(err)
-      }, { quoted: msg });
+      await sock.sendMessage(from, { text: String(err) }, { quoted: msg });
     }
 
     return;
@@ -137,35 +153,17 @@ async function handleMessage(sock, msg, from, body) {
 
     exec(command, async (err, stdout, stderr) => {
       if (err) {
-        await sock.sendMessage(from, {
-          text: err.message
-        }, { quoted: msg });
-
+        await sock.sendMessage(from, { text: err.message }, { quoted: msg });
         return;
       }
 
       const output = stdout || stderr || "No output";
-
-      await sock.sendMessage(from, {
-        text: output
-      }, { quoted: msg });
+      await sock.sendMessage(from, { text: output }, { quoted: msg });
     });
 
     return;
   }
 }
 
-Bun.serve({
-  port: 3000,
-
-  fetch(req) {
-    return Response.json({
-      ok: true,
-    });
-  },
-});
-
-console.log("HTTP server running on port 3000");
-
+startServer();
 startSocket().catch(console.error);
-
