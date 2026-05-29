@@ -7,25 +7,11 @@ import makeWASocket, {
 import pino from "pino";
 import http from "node:http";
 import { Boom } from "@hapi/boom";
-import mysql from "mysql2/promise";
 import { exec } from "child_process";
 import util from "util";
 
 import { useMySQLAuthState } from "./lib/useMySQLAuthState.js"
-
-const pool = mysql.createPool({
-  host: process.env.DB_HOST || "localhost",
-  port: Number(process.env.DB_PORT) || 3306,
-  user: process.env.DB_USER || "root",
-  password: process.env.DB_PASSWORD || "",
-  database: process.env.DB_NAME || "mydb",
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-  idleTimeout: 60000,
-  enableKeepAlive: true,
-  keepAliveInitialDelay: 0,
-});
+import { pool, closeDatabasePool } from "./mysqlDB.js"
 
 const PORT = Number(process.env.PORT) || 3000;
 const IS_BUN = typeof Bun !== "undefined";
