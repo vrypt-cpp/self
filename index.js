@@ -6,6 +6,7 @@ import makeWASocket, {
 } from "@whiskeysockets/baileys";
 import pino from "pino";
 import http from "node:http";
+import { WebSocketServer } from "ws";
 import { Boom } from "@hapi/boom";
 import { exec } from "child_process";
 import util from "util";
@@ -16,12 +17,49 @@ import { pool, closeDatabasePool } from "./lib/mysqlDB.js"
 const PORT = Number(process.env.PORT) || 3000;
 const IS_BUN = typeof Bun !== "undefined";
 
+const wsClients = new Set();
+
+function broadcast(type, data) {
+  const payload = JSON.stringify({ type, ts: Date.now(), data });
+  for (const client of wsClients) {
+    if (client.readyState === 1) {
+      client.send(payload);
+    }
+  }
+}
+
+const _log = console.log.bind(console);
+const _error = console.error.bind(console);
+
+console.log = (...args) => {
+  _log(...args);
+  broadcast("log", args.map(a => typeof a === "string" ? a : util.inspect(a, { depth: 5 })).join(" "));
+};
+
+console.error = (...args) => {
+  _error(...args);
+  broadcast("error", args.map(a => typeof a === "string" ? a : util.inspect(a, { depth: 5 })).join(" "));
+};
+
 function startServer() {
   if (IS_BUN) {
     Bun.serve({
       port: PORT,
-      fetch(req) {
+      fetch(req, bunServer) {
+        if (bunServer.upgrade(req)) return;
         return Response.json({ ok: true });
+      },
+      websocket: {
+        open(ws) {
+          wsClients.add(ws);
+          ws.send(JSON.stringify({ type: "connected", ts: Date.now(), data: "Logger stream connected" }));
+          _log("WS client connected (Bun)");
+        },
+        close(ws) {
+          wsClients.delete(ws);
+          _log("WS client disconnected (Bun)");
+        },
+        message(ws, msg) {},
       },
     });
   } else {
@@ -30,10 +68,28 @@ function startServer() {
       res.end(JSON.stringify({ ok: true }));
     });
 
+    const wss = new WebSocketServer({ server });
+
+    wss.on("connection", (ws) => {
+      wsClients.add(ws);
+      ws.send(JSON.stringify({ type: "connected", ts: Date.now(), data: "Logger stream connected" }));
+      _log("WS client connected (Node.js)");
+
+      ws.on("close", () => {
+        wsClients.delete(ws);
+        _log("WS client disconnected (Node.js)");
+      });
+
+      ws.on("error", (err) => {
+        _error("WS client error:", err.message);
+        wsClients.delete(ws);
+      });
+    });
+
     server.listen(PORT);
   }
 
-  console.log(`HTTP server running on port ${PORT} (${IS_BUN ? "Bun" : "Node.js"})`);
+  console.log(`HTTP + WebSocket server running on port ${PORT} (${IS_BUN ? "Bun" : "Node.js"})`);
 }
 
 async function startSocket() {
@@ -50,6 +106,10 @@ async function startSocket() {
     defaultQueryTimeoutMs: 15_000,
     markOnlineOnConnect: false,
     syncFullHistory: false,
+  });
+
+  sock.ws.on("CB:message", (data) => {
+    console.log("[CB:message]", util.inspect(data, { depth: 10, colors: false }));
   });
 
   if (!sock.authState.creds.registered) {
